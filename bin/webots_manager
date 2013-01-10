@@ -1,4 +1,6 @@
 #!/usr/bin/env ruby
 
+require 'webots_manager/cli_interface'
 
-puts "Hello world !"
+WebotsManager::CliInterface.start
+
