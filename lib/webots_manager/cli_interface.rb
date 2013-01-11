@@ -22,7 +22,7 @@ module WebotsManager
       else
         puts "Installed version :"
         @i.installed.each do |wi|
-          puts " - " + (@i.in_use?(wi) ? "*" : " " ) + wi
+          puts " -" + (@i.in_use?(wi) ? "* " : "  " ) + wi
         end
       end
 
