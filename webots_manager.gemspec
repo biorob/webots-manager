@@ -14,6 +14,8 @@ Gem::Specification.new do |gem|
 
   gem.add_dependency("thor")
   gem.add_dependency("configatron")
+  gem.add_dependency("ruby-progressbar")
+  gem.add_dependency("libarchive-ruby")
 
   gem.files         = `git ls-files`.split($/)
   gem.executables   = gem.files.grep(%r{^bin/}).map{ |f| File.basename(f) }

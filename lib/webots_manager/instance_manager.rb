@@ -4,6 +4,10 @@ require 'timeout'
 
 require 'open-uri'
 
+require 'ruby-progressbar'
+
+require 'archive'
+
 module WebotsManager
 
   class InstanceManager
@@ -26,15 +30,57 @@ module WebotsManager
       version === in_use
     end
 
-    def install
-      raise "Unimplemented yet"
+    def install version
+      if @installed.include? version
+        raise "#{version} is already installed"
+      end
+
+      unless @available.include? version
+        raise "#{version} is not available"
+      end
+
+
+      tmpfile = Tempfile.new(['webots_manager_download-',
+                               configatron.suffix],
+                         Dir.tmpdir,'rwb')
+
+      puts "Downloading version #{version} in #{tmpfile.path}"
+      pbar = nil
+
+      open(@available[version],
+      :content_length_proc => lambda { |t|
+             if t && 0 < t
+               pbar = ProgressBar.create :total => t
+             end
+           },
+      :progress_proc => lambda { |s|
+             pbar.progress = s if pbar }) do |f|
+        tmpfile.write(f.read)
+      end
+
+
+      install_path = File.join(@wdir, version + "_in_installation")
+      final_path = File.join(@wdir,version)
+      puts "Extracting #{tmpfile.path} to #{install_path}"
+      a = Archive.new(tmpfile.path)
+      Dir.chdir(@wdir) do
+        d = Dir.mkdir(install_path) unless File.directory? install_path
+        Dir.chdir(install_path) do
+          a.extract
+        end
+        webots_install = File.join(install_path,'webots')
+        puts "Moving #{webots_install} to #{final_path}"
+        File.rename(webots_install,final_path)
+        Dir.rmdir(install_path) # should be empty
+      end
+
     end
 
     def remove
       raise "Unimplemented yet"
     end
 
-    def use
+    def use version
       raise "Unimplemented yet"
     end
 
@@ -70,8 +116,7 @@ module WebotsManager
       @installed = []
       Dir.new(@wdir).each do |f|
         /[0-9]+(\.[0-9]+)*/.match(f) do |m|
-          @installed.insert(m)
-          puts "Version #{m} installed"
+          @installed.push(f)
         end
       end
     end
