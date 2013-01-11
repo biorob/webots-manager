@@ -10,7 +10,6 @@ module WebotsManager
 
     def initialize
       restore_state
-      get_available_from_archive
     end
 
     attr_reader :available
@@ -41,23 +40,22 @@ module WebotsManager
 
     private
 
-    def restore_state
-      @available = {}
-      @installed = []
-      @last_update = Time.utc(2000,"jan",1,20,15,1)
-      @in_use    = nil
+    def create_if_needed_wdir
+      @wdir = configatron.install_prefix
+      Dir.mkdir(@wdir,0755) unless File.directory? @wdir
     end
 
-    def save_state
-      #not implemented
+    def restore_state
+      create_if_needed_wdir
+      get_available_from_archive
+      get_installed_from_wdir
+      get_in_use_from_wdir
     end
 
     def get_available_from_archive
+      @available = {}
       file = open configatron.cyberbotics_archive , :read_timeout => 10
 
-      if file.last_modified and file.last_modified < @last_update
-        return
-      end
       escaped_suffix = configatron.suffix.gsub(/\./,'\.')
       r = /[Ww]ebots-([0-9]+(\.[0-9]+)*)-#{configatron.arch}#{escaped_suffix}/
       file.each_line do |l|
@@ -65,6 +63,28 @@ module WebotsManager
           @available[m[1]] = "#{configatron.cyberbotics_archive}#{m}"
         end
       end
+
     end
+
+    def get_installed_from_wdir
+      @installed = []
+      Dir.new(@wdir).each do |f|
+        /[0-9]+(\.[0-9]+)*/.match(f) do |m|
+          @installed.insert(m)
+          puts "Version #{m} installed"
+        end
+      end
+    end
+
+    def get_in_use_from_wdir
+      @in_use = nil
+      Dir.chdir(@wdir) do
+        if File.symlink?('in_use')
+          @in_use = File.readlink('in_use')
+        end
+      end
+    end
+
+
   end
 end
