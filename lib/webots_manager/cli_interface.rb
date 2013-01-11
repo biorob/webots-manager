@@ -28,11 +28,11 @@ module WebotsManager
 
       if options[:all]
         puts "Available versions :"
-        instances.available.each do |wi|
+        instances.available.each do |wi,url|
           puts " - " + wi
         end
       elsif not instances.available.empty?
-        puts "Latest available version : " + instances.available.last
+        puts "Latest available version : " + instances.available.keys.last
       else
         puts "No available versions."
       end

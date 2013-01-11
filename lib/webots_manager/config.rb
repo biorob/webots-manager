@@ -23,4 +23,12 @@ else
   raise RuntimeError, "System #{RbConfig::CONFIG['host_os']} is not supported"
 end
 
+
+case RbConfig::CONFIG['host_cpu']
+when /i386|i486|i686/
+  configatron.arch = 'i386'
+when /amd64|x86[_\-]64/
+  configatron.arch = 'x86-64'
+end
+
 configatron.webots_prefix = configatron.webots_home.sub(/\/[Ww]ebots\/*\Z/,'')
