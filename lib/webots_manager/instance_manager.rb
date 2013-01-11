@@ -81,7 +81,40 @@ module WebotsManager
     end
 
     def use version
-      raise "Unimplemented yet"
+      unless @installed.include? version
+        raise "Version #{version} is not installed"
+      end
+
+      Dir.chdir(@wdir) do
+
+        if @in_use
+          File.delete('in_use')
+          @in_use = nil
+        end
+
+        File.symlink(version,'in_use')
+        @in_use = version
+
+      end
+
+      #test if global symlink is ok
+      Dir.chdir(File.dirname(@wdir)) do
+        if not File.symlink?('webots')
+          File.symlink('webots_manager/in_use','webots')
+        elsif File.readlink('webots') != 'webots_manager/in_use'
+          raise "Symlink to webots does not point to webots_manager/in_use"
+        end
+      end
+
+      #Test if Webots Home is set or not
+      if ENV['WEBOTS_HOME'].nil?
+        puts "WEBOTS_HOME environment variable is not set. please add :
+export WEBOTS_HOME=/usr/local/webots to your .bashrc or .profile"
+      elsif ENV['WEBOTS_HOME'] != '/usr/local/webots'
+        puts "WARNING : you should change your WEBOTS_HOME variable to point to
+/usr/local/webots, it is currently #{ENV['WEBOTS_HOME']}"
+      end
+
     end
 
     private

@@ -55,5 +55,12 @@ module WebotsManager
       end
 
     end
+
+    desc "use VERSION" , "Ask the system to use webots version VERSION"
+    def use version
+      @i = InstanceManager.new
+      @i.use version
+    end
+
   end
 end
