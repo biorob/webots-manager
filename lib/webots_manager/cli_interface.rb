@@ -56,6 +56,9 @@ module WebotsManager
         @i.use version
       end
 
+      @f = TemplateFilesManager.new
+      @f.update_links @i.installed
+
     end
 
     desc "use VERSION" , "Ask the system to use webots version VERSION"
@@ -71,6 +74,7 @@ module WebotsManager
       @i = InstanceManager.new
       @f = TemplateFilesManager.new
       @f.add_file filename,local_path,options
+      @f.update_links @i.installed
     end
 
     desc 'remove_template LOCAL_PATH', "Removes all templates that points to $WEBOTS/LOCAL_PATH"

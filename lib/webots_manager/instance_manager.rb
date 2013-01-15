@@ -73,7 +73,7 @@ module WebotsManager
         File.rename(webots_install,final_path)
         Dir.rmdir(install_path) # should be empty
       end
-
+      @installed.push version
     end
 
     def remove

@@ -87,11 +87,16 @@ module WebotsManager
       save_state
     end
 
+    def should_link version,whitelist,blacklist
+      whitelist_grants = whitelist.empty? || whitelist.include?(version)
+      blacklist_grants = ! blacklist.include?(version)
+      should_link = whitelist_grants && blacklist_grants
+    end
+
     def update_links versions
       @templates.each do |d,opt|
         versions.each do |v|
-          should_link = (opt[:only].empty? || opt[:only].include?(v)) and not opt[:except].include?(v)
-          if should_link
+          if should_link(v,opt[:only],opt[:except])
             create_or_update_link d,opt,v
           else
             remove_link_if_needed opt,v
@@ -114,9 +119,10 @@ module WebotsManager
     end
 
     def remove_link_if_needed opt,version
-      Dir.chir(dir_for_version(version)) do
+      Dir.chdir(dir_for_version(version)) do
         opt[:paths].each do |p|
           if is_a_managed_symlink(p)
+            puts "Remove link to '#{p}' for version #{version}"
             File.unlink(p)
           end
         end
@@ -127,10 +133,14 @@ module WebotsManager
       target_file = File.join(@wdir,d)
       Dir.chdir(dir_for_version(version)) do
         opt[:paths].each do |p|
+          removed = false
           if is_a_managed_symlink(p)
+            removed = true
             File.unlink(p)
           end
           unless File.exists? p
+            puts (removed ? "Updated link to '#{p}' for version #{version}"
+                          : "Create link to '#{p}' for version #{version}")
             File.symlink(target_file,p)
           end
         end
