@@ -28,6 +28,8 @@ module WebotsManager
           end
         end
       end
+
+      @paths.delete(local_path)
       save_state
     end
 
