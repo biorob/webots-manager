@@ -44,7 +44,7 @@ module WebotsManager
           @paths[path] = []
         end
         unless @paths[path].include? digest
-          @paths.push digest
+          @paths[path].push digest
         end
       end
 
@@ -101,6 +101,8 @@ module WebotsManager
 
     private
 
+    attr_accessor :templates, :paths
+
     def dir_for_version v
       File.join(File.dirname(@wdir),v)
     end
@@ -156,35 +158,39 @@ module WebotsManager
     end
 
     def load_state
+      @templates ||= {}
+      @paths     ||= {}
+
       @wdir = File.join(configatron.install_prefix,'templates')
       Dir.mkdir(@wdir,0755) unless File.directory? @wdir
       Dir.chdir(@wdir) do
-        @dbfile = 'template_db.yml'
-        unless File.exists? @dbfile
-          File.open(@dbfile,'w') do |f|
-            f.puts ""
+        @object_files = ['templates','paths']
+        @object_files.each do |f|
+          filename = f + '_db.yml'
+          unless File.exists? filename
+            File.open(filename,'w') do |new_file|
+              new_file.puts ""
+            end
+          end
+          File.open(filename,'r') do |saved|
+            self.send(f+'=',YAML::load(saved) || {} )
           end
         end
-        objects = []
-        File.open(@dbfile,'r').each do |object|
-         object << YAML::load(object)
-        end
-        @templates = objects[0]
-        @paths     = objects[1]
       end
-      @templates ||= {}
-      @paths     ||= {}
+
     end
 
 
     def save_state
       Dir.chdir(@wdir) do
-        File.open(@dbfile,'w') do |f|
-          f.puts YAML::dump(@templates)
+        @object_files.each do |f|
+          File.open(f + '_db.yml','w') do |file|
+            file.puts YAML::dump(self.send(f))
+          end
         end
+
       end
     end
 
-    
   end
 end
