@@ -8,12 +8,27 @@ module WebotsManager
       load_state
     end
 
-    def remove_file filename
-      d = compute_digest filename
-      unless @templates.include? d
-        raise "No file with content of '#{filename}' is stored."
+    def remove_file local_path , versions
+      unless @paths.include? local_path
+        raise "No template file are installed for local_path #{local_path}"
       end
-      @templates.delete d
+
+
+      @paths[local_path].each do |digest|
+        @templates[digest][:paths].delete(local_path)
+        if @templates[digest][:paths].empty?
+          unstore digest
+        end
+      end
+
+      versions.each do |v|
+        Dir.chdir(dir_for_version(v)) do
+          if is_a_managed_symlink local_path
+            File.unlink local_path
+          end
+        end
+      end
+      save_state
     end
 
     def add_file filename,path,*opts
@@ -23,8 +38,14 @@ module WebotsManager
         store filename , digest
       end
 
-      unless entry[:paths].include? path
+      unless @templates[digest][:paths].include? path
         @templates[digest][:paths].push path
+        unless @paths.include? path
+          @paths[path] = []
+        end
+        unless @paths[path].include? digest
+          @paths.push digest
+        end
       end
 
       if opts.include? :only
@@ -67,7 +88,7 @@ module WebotsManager
     def update_links versions
       @templates.each do |d,opt|
         versions.each do |v|
-          should_link = (opt[:only].empty? || opt[:only].include?(v)) && not opt[:except].include?(v)
+          should_link = (opt[:only].empty? || opt[:only].include?(v)) and not opt[:except].include?(v)
           if should_link
             create_or_update_link d,opt,v
           else
@@ -122,13 +143,21 @@ module WebotsManager
       @templates[digest] = {:paths => [], :only => [], :except => [] }
     end
 
+    def unstore digest
+      stored_file = File.join(@wdir,digest)
+      if File.exists? stored_file
+        File.unlink stored_file
+      end
+      @templates.delete digest
+    end
+
     def compute_digest filename
       return Digest::MD5.hexdigest(File.read(filename))
     end
 
     def load_state
       @wdir = File.join(configatron.install_prefix,'templates')
-      Diro.mkdir(@wdir,0755) unless File.directory? @wdir
+      Dir.mkdir(@wdir,0755) unless File.directory? @wdir
       Dir.chdir(@wdir) do
         @dbfile = 'template_db.yml'
         unless File.exists? @dbfile
@@ -136,11 +165,15 @@ module WebotsManager
             f.puts ""
           end
         end
-        File.open(File.join('templates','template_db.yml'),'r').each do |object|
-          @templates = YAML::load(object)
+        objects = []
+        File.open(@dbfile,'r').each do |object|
+         object << YAML::load(object)
         end
+        @templates = objects[0]
+        @paths     = objects[1]
       end
       @templates ||= {}
+      @paths     ||= {}
     end
 
 
@@ -152,6 +185,6 @@ module WebotsManager
       end
     end
 
-
+    
   end
 end
