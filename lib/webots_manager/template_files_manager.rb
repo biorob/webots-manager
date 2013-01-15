@@ -31,7 +31,7 @@ module WebotsManager
       save_state
     end
 
-    def add_file filename,path,*opts
+    def add_file filename,path,opts = {}
       digest = compute_digest filename
 
       unless @templates.include? digest
@@ -48,12 +48,12 @@ module WebotsManager
         end
       end
 
-      if opts.include? :only
-        @templates[digest][:only] = opts[:only]
+      if opts.include? 'only'
+        @templates[digest][:only].concat(opts['only']).uniq!
       end
 
-      if opts.include? :except
-        @templates[digest][:except] = opts[:except]
+      if opts.include? 'except'
+        @templates[digest][:except].concat(opts['except']).uniq!
       end
       save_state
     end
