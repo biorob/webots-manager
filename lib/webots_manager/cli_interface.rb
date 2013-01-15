@@ -3,6 +3,8 @@ require 'thor'
 
 require 'webots_manager/config'
 require 'webots_manager/instance_manager.rb'
+require 'webots_manager/template_files_manager.rb'
+
 
 module WebotsManager
 
@@ -60,6 +62,15 @@ module WebotsManager
     def use version
       @i = InstanceManager.new
       @i.use version
+    end
+
+    desc "add_template FILENAME LOCAL_PATH", "Add a template file FILENAME in all $WEBOTS_HOME/LOCAL_PATH"
+    method_option :only, :aliases => "-o", :type => :array, :desc => "a list of version to whitelist"
+    method_option :except, :aliases => "-e", :type => :array, :desc => "a list of version to blacklist"
+    def add_template filename, local_path
+      @i = InstanceManager.new
+      @f = TemplateFilesManager.new
+      @f.add_file filename,local_path,options
     end
 
   end
