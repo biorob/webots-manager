@@ -73,5 +73,11 @@ module WebotsManager
       @f.add_file filename,local_path,options
     end
 
+    desc 'remove_template LOCAL_PATH', "Removes all templates that points to $WEBOTS/LOCAL_PATH"
+    def remove_template local_path
+      @i = InstanceManager.new
+      @f = TemplateFilesManager.new
+      @f.remove_file local_path, @i.installed
+    end
   end
 end
