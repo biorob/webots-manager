@@ -6,7 +6,6 @@ require 'open-uri'
 
 require 'ruby-progressbar'
 
-require 'libarchive'
 
 module WebotsManager
 
@@ -62,11 +61,10 @@ module WebotsManager
       install_path = File.join(@wdir, version + "_in_installation")
       final_path = File.join(@wdir,version)
       puts "Extracting #{tmpfile.path} to #{install_path}"
-      a = Archive.new(tmpfile.path)
       Dir.chdir(@wdir) do
         d = Dir.mkdir(install_path) unless File.directory? install_path
         Dir.chdir(install_path) do
-          a.extract
+          system("tar -x -f #{tmpfile.path} -C #{install_path}") 
         end
         webots_install = File.join(install_path,'webots')
         puts "Moving #{webots_install} to #{final_path}"
