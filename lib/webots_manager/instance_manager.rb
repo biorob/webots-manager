@@ -6,7 +6,7 @@ require 'open-uri'
 
 require 'ruby-progressbar'
 
-require 'archive'
+require 'libarchive'
 
 module WebotsManager
 
