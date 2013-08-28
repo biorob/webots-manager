@@ -9,6 +9,7 @@ when /linux|cygwin/
   configatron.install_prefix      = '/usr/local/webots_manager'
   configatron.cyberbotics_archive =   configatron.cyberbotics_archive + 'linux/'
   configatron.suffix              = '.tar.bz2'
+  configatron.group_name          = 'webots-manager'
 # when /mac|darwin/
 #   configatron.webots_home = ENV['WEBOTS_HOME'] || '/Applications/Webots'
 #   configatron.install_prefix = '/usr/local/webots_manager'

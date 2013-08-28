@@ -10,6 +10,12 @@ module WebotsManager
 
   class CliInterface < Thor
 
+    desc "init", "Init webots_manager. Shoudl be runned as root"
+    def init
+      InstanceManager.init
+    end
+
+
     desc "version" , "print the current version number"
     def version
       puts "webots_manager #{VERSION}"

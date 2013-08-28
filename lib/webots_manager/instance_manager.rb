@@ -115,15 +115,57 @@ export WEBOTS_HOME=/usr/local/webots to your .bashrc or .profile"
 
     end
 
-    private
 
-    def create_if_needed_wdir
-      @wdir = configatron.install_prefix
-      Dir.mkdir(@wdir,0755) unless File.directory? @wdir
+    def self.init
+      unless Process::uid == 0 && Process::euid == 0
+        raise "I must be run by root for this operation"
+      end
+
+      gname = configatron.group_name
+
+      begin 
+        rgid = Process::GID.from_name(gname)
+      rescue
+        system "addgroup  #{gname}"
+        rgid = Process::GID.from_name(gname)
+      end
+
+      wdir = configatron.install_prefix
+
+
+
+      #Adds a global symlink
+      Dir.chdir(File.dirname(wdir)) do
+
+        if File.exists?('webots')|| File.symlink?('webots')
+          File.rename 'webots', 'webots.webots_manager.bak'
+        end        
+        File.symlink('webots_manager/in_use','webots')
+      end
+
+
+      Process::Sys.setgid(rgid)
+        
+      Dir.mkdir(wdir,2775) unless File.directory? wdir
+      
+      puts "Working directory have been created in #{wdir}, and group '#{gname}' have been created. To use webots_manager, please add yourself to the group '#{gname}'"
+
+      ## now evrything is ok !
     end
 
+    def is_init?
+      @wdir = configatron.install_prefix
+      return File.directory? @wdir
+    end
+
+    private
+
+    
+    
     def restore_state
-      create_if_needed_wdir
+      unless is_init?
+        raise "Installation is not initialized, please use init command first"
+      end
       get_available_from_archive
       get_installed_from_wdir
       get_in_use_from_wdir
