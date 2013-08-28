@@ -144,10 +144,9 @@ export WEBOTS_HOME=/usr/local/webots to your .bashrc or .profile"
       end
 
 
-      Process::Sys.setgid(rgid)
-        
-      Dir.mkdir(wdir,2775) unless File.directory? wdir
-      
+      Dir.mkdir(wdir,755)
+      FileUtils.chown 'root', gname, wdir
+      FileUtils.chmod "ug=rwxs,o=rx", wdir
       puts "Working directory have been created in #{wdir}, and group '#{gname}' have been created. To use webots_manager, please add yourself to the group '#{gname}'"
 
       ## now evrything is ok !
