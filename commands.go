@@ -12,12 +12,17 @@ type InstallCommand struct{}
 
 type Interactor struct {
 	archive WebotsArchive
+	manager WebotsInstanceManager
 }
 
 func NewInteractor() (*Interactor, error) {
 	res := &Interactor{}
 	var err error
 	res.archive, err = NewWebotsHttpArchive("http://www.cyberbotics.com/archive/")
+	if err != nil {
+		return nil, err
+	}
+	res.manager, err = NewSymlinkManager(res.archive)
 	if err != nil {
 		return nil, err
 	}
@@ -29,7 +34,18 @@ func (x *ListCommand) Execute(args []string) error {
 	if err != nil {
 		return err
 	}
-	fmt.Println("No webots version are installed")
+	installed := xx.manager.Installed()
+	if len(installed) == 0 {
+		fmt.Printf("No webots version installed.\n")
+	} else {
+		for _, v := range installed {
+			if xx.manager.IsUsed(v) == true {
+				fmt.Printf(" -* %s\n", v)
+			} else {
+				fmt.Printf(" -  %s\n", v)
+			}
+		}
+	}
 	if x.All {
 		fmt.Println("List of all available versions:")
 		for _, v := range xx.archive.AvailableVersions() {
@@ -48,7 +64,7 @@ func (x *ListCommand) Execute(args []string) error {
 }
 
 func (x *InitCommand) Execute(args []string) error {
-	return fmt.Errorf("Not yet implemented")
+	return SymlinkManagerSystemInit()
 }
 
 func (x *InstallCommand) Execute(args []string) error {
