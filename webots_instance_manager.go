@@ -113,7 +113,7 @@ func symlinkManagerPath() (string, string, string, error) {
 		return "", "", "", fmt.Errorf("Only linux is supported yet")
 	}
 	basepath := "/usr/local"
-	workpath := path.Join(basepath, "webots_manager")
+	workpath := path.Join(basepath, "webots-manager")
 	installpath := path.Join(basepath, "webots")
 	return basepath, workpath, installpath, nil
 
@@ -216,6 +216,7 @@ func (m *SymlinkWebotsManager) extractFile(v WebotsVersion, h *tar.Header, r io.
 	if dest == path.Join(m.workpath, v.String()) {
 		return nil
 	}
+
 	switch h.Typeflag {
 	case tar.TypeReg, tar.TypeRegA:
 		destDir := path.Dir(dest)
@@ -251,7 +252,12 @@ func (m *SymlinkWebotsManager) extractFile(v WebotsVersion, h *tar.Header, r io.
 		return fmt.Errorf("Internal error, cannot handle file %s", h.Name)
 	}
 
-	err := os.Chtimes(dest, time.Now(), h.ModTime)
+	err := os.Chtimes(dest, time.Now(), h.FileInfo().ModTime())
+	if err != nil {
+		return err
+	}
+
+	err = os.Chmod(dest, h.FileInfo().Mode())
 	if err != nil {
 		return err
 	}
