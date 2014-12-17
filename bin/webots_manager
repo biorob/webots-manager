@@ -1,6 +1,0 @@
-#!/usr/bin/env ruby
-
-require 'webots_manager/cli_interface'
-
-WebotsManager::CliInterface.start
-
