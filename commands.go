@@ -1,6 +1,9 @@
 package main
 
-import "fmt"
+import (
+	"fmt"
+	"log"
+)
 
 type ListCommand struct {
 	All bool `short:"a" long:"available" description:"also prints all available version for installation"`
@@ -8,7 +11,9 @@ type ListCommand struct {
 
 type InitCommand struct{}
 
-type InstallCommand struct{}
+type InstallCommand struct {
+	Use bool `short:"u" long:"use" description:"force use of this new version after installation"`
+}
 
 type Interactor struct {
 	archive WebotsArchive
@@ -82,7 +87,27 @@ func (x *InstallCommand) Execute(args []string) error {
 		return err
 	}
 
-	return xx.manager.Install(v)
+	err = xx.manager.Install(v)
+	if err != nil {
+		return err
+	}
+
+	notUsed := true
+	for _, vv := range xx.manager.Installed() {
+		if xx.manager.IsUsed(vv) {
+			notUsed = false
+			break
+		}
+	}
+
+	if notUsed || x.Use {
+		err = xx.manager.Use(v)
+		if err != nil {
+			return err
+		}
+		log.Printf("Using now version %s", v)
+	}
+	return nil
 }
 
 func init() {

@@ -12,7 +12,6 @@ import (
 	"os"
 	"os/exec"
 	"path"
-	"path/filepath"
 	"regexp"
 	"runtime"
 	"sort"
@@ -171,17 +170,7 @@ func (i *SymlinkWebotsManager) listUsed() error {
 		return err
 	}
 
-	absDest, err := filepath.Abs(dest)
-	if err != nil {
-		return err
-	}
-
-	if path.Dir(absDest) != i.workpath {
-		return fmt.Errorf("%s is a symlink, but do not point to %s subdirectory (%s)",
-			i.installpath, i.workpath, dest)
-	}
-
-	v, err := ParseWebotsVersion(path.Base(absDest))
+	v, err := ParseWebotsVersion(dest)
 	if err != nil {
 		return fmt.Errorf("Invalid %s target %s", i.installpath, dest)
 	}
@@ -325,7 +314,23 @@ func (m *SymlinkWebotsManager) Install(v WebotsVersion) error {
 	if err != nil {
 		return err
 	}
-	log.Printf("Successfuly installed %s", v)
+
+	found := false
+	for _, vv := range m.installed {
+		if vv == v {
+			found = true
+			break
+		}
+	}
+
+	if found == false {
+		log.Printf("Successfuly installed %s", v)
+		m.installed = append(m.installed, v)
+		sort.Sort(&m.installed)
+	} else {
+		log.Printf("Successfuly re-installed %s", v)
+	}
+
 	return nil
 }
 
@@ -443,5 +448,31 @@ func SymlinkManagerSystemInit() error {
 }
 
 func (m *SymlinkWebotsManager) Use(v WebotsVersion) error {
-	return fmt.Errorf("Not yet implemented")
+	found := false
+	for _, vv := range m.installed {
+		if vv == v {
+			found = true
+			break
+		}
+	}
+	if found == false {
+		log.Printf("Installing missing version %s", v)
+		err := m.Install(v)
+		if err != nil {
+			return err
+		}
+	}
+
+	err := os.RemoveAll(m.usedpath)
+	if err != nil {
+		return err
+	}
+	err = os.Symlink(v.String(), m.usedpath)
+	if err != nil {
+		return err
+	}
+
+	m.inUse = &v
+
+	return nil
 }
