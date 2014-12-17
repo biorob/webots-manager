@@ -28,6 +28,7 @@ type WebotsInstanceManager interface {
 	Use(WebotsVersion) error
 	IsUsed(WebotsVersion) bool
 	Installed() []WebotsVersion
+	ApplyAllTemplates() error
 }
 
 type SymlinkWebotsManager struct {
@@ -39,6 +40,7 @@ type SymlinkWebotsManager struct {
 	installed   WebotsVersionList
 	inUse       *WebotsVersion
 	archive     WebotsArchive
+	templates   TemplateManager
 	gid         int
 }
 
@@ -52,6 +54,12 @@ func NewSymlinkManager(a WebotsArchive) (*SymlinkWebotsManager, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	res.templates, err = NewHasHTemplateManager(path.Join(res.workpath, "templates"))
+	if err != nil {
+		return nil, err
+	}
+
 	res.usedpath = path.Join(res.workpath, "used")
 	res.lock, err = lockfile.New(path.Join(res.workpath, "global.lock"))
 	if err != nil {
@@ -304,7 +312,7 @@ func (m *SymlinkWebotsManager) uncompressFromHttp(v WebotsVersion, addr string) 
 	return nil
 }
 
-func (m *SymlinkWebotsManager) Install(v WebotsVersion) error {
+func (m *SymlinkWebotsManager) install(v WebotsVersion) error {
 	address, err := m.archive.GetUrl(v)
 	if err != nil {
 		return err
@@ -323,6 +331,11 @@ func (m *SymlinkWebotsManager) Install(v WebotsVersion) error {
 		}
 	}
 
+	log.Printf("Installing templates for %s", v)
+	err = m.templates.ApplyTemplates(path.Join(m.workpath, v.String()), v)
+	if err != nil {
+		return err
+	}
 	if found == false {
 		log.Printf("Successfuly installed %s", v)
 		m.installed = append(m.installed, v)
@@ -332,6 +345,14 @@ func (m *SymlinkWebotsManager) Install(v WebotsVersion) error {
 	}
 
 	return nil
+}
+
+func (m *SymlinkWebotsManager) Install(v WebotsVersion) error {
+	if err := m.tryLock(); err != nil {
+		return err
+	}
+	defer m.unlock()
+	return m.install(v)
 }
 
 func (m *SymlinkWebotsManager) Installed() []WebotsVersion {
@@ -448,6 +469,11 @@ func SymlinkManagerSystemInit() error {
 }
 
 func (m *SymlinkWebotsManager) Use(v WebotsVersion) error {
+	if err := m.tryLock(); err != nil {
+		return err
+	}
+	defer m.unlock()
+
 	found := false
 	for _, vv := range m.installed {
 		if vv == v {
@@ -457,7 +483,7 @@ func (m *SymlinkWebotsManager) Use(v WebotsVersion) error {
 	}
 	if found == false {
 		log.Printf("Installing missing version %s", v)
-		err := m.Install(v)
+		err := m.install(v)
 		if err != nil {
 			return err
 		}
@@ -474,5 +500,15 @@ func (m *SymlinkWebotsManager) Use(v WebotsVersion) error {
 
 	m.inUse = &v
 
+	return nil
+}
+
+func (m *SymlinkWebotsManager) ApplyAllTemplates() error {
+	for _, v := range m.installed {
+		err := m.templates.ApplyTemplates(path.Join(m.workpath, v.String()), v)
+		if err != nil {
+			return err
+		}
+	}
 	return nil
 }
