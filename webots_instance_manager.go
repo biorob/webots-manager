@@ -1,7 +1,9 @@
 package main
 
 import (
+	"archive/tar"
 	"bufio"
+	"compress/bzip2"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -15,7 +17,10 @@ import (
 	"runtime"
 	"sort"
 	"strconv"
+	"strings"
+	"time"
 
+	"github.com/cheggaaa/pb"
 	"github.com/nightlyone/lockfile"
 )
 
@@ -35,11 +40,14 @@ type SymlinkWebotsManager struct {
 	installed   WebotsVersionList
 	inUse       *WebotsVersion
 	archive     WebotsArchive
+	gid         int
 }
 
 func NewSymlinkManager(a WebotsArchive) (*SymlinkWebotsManager, error) {
 	var err error
-	res := &SymlinkWebotsManager{}
+	res := &SymlinkWebotsManager{
+		archive: a,
+	}
 
 	res.basepath, res.workpath, res.installpath, err = symlinkManagerPath()
 	if err != nil {
@@ -61,7 +69,7 @@ func NewSymlinkManager(a WebotsArchive) (*SymlinkWebotsManager, error) {
 	}
 
 	//checks that we have the right gid
-	gid, err := getGid("webots-manager")
+	res.gid, err = getGid("webots-manager")
 	if err != nil {
 		return nil, err
 	}
@@ -73,7 +81,7 @@ func NewSymlinkManager(a WebotsArchive) (*SymlinkWebotsManager, error) {
 	}
 
 	for _, g := range userGroups {
-		if g == gid {
+		if g == res.gid {
 			found = true
 			break
 		}
@@ -193,55 +201,116 @@ func (i *SymlinkWebotsManager) listUsed() error {
 
 type ProgressReader struct {
 	reader   io.Reader
-	progress chan int
+	progress chan int64
 }
 
 func (r *ProgressReader) Read(p []byte) (int, error) {
 	n, err := r.reader.Read(p)
 	if n > 0 {
-		r.progress <- n
+		r.progress <- int64(n)
 	}
 	return n, err
 }
 
-func downloadHttpFile(addr, dest string) error {
+func (m *SymlinkWebotsManager) extractFile(v WebotsVersion, h *tar.Header, r io.Reader) error {
+
+	dest := strings.TrimPrefix(h.Name, "webots/")
+	dest = path.Join(m.workpath, v.String(), dest)
+	if dest == path.Join(m.workpath, v.String()) {
+		return nil
+	}
+	switch h.Typeflag {
+	case tar.TypeReg, tar.TypeRegA:
+		destDir := path.Dir(dest)
+		err := os.MkdirAll(destDir, 0775)
+		if err != nil {
+			return err
+		}
+		f, err := os.Create(dest)
+		if err != nil {
+			return err
+		}
+		_, err = io.Copy(f, r)
+		if err != nil {
+			return err
+		}
+	case tar.TypeDir:
+		err := os.MkdirAll(dest, 0775)
+		if err != nil {
+			return err
+		}
+	case tar.TypeSymlink:
+		destDir := path.Dir(dest)
+		err := os.MkdirAll(destDir, 0775)
+		if err != nil {
+			return err
+		}
+		err = os.Symlink(h.Linkname, dest)
+		if err != nil {
+			return err
+		}
+		return nil
+	default:
+		return fmt.Errorf("Internal error, cannot handle file %s", h.Name)
+	}
+
+	err := os.Chtimes(dest, time.Now(), h.ModTime)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (m *SymlinkWebotsManager) uncompressFromHttp(v WebotsVersion, addr string) error {
+	dest := path.Join(m.workpath, v.String())
+	err := os.RemoveAll(dest)
+	if err != nil {
+		return err
+	}
+	err = os.MkdirAll(dest, 0775|os.ModeSetgid)
+	if err != nil {
+		return err
+	}
+
 	resp, err := http.Get(addr)
 	if err != nil {
 		return err
 	}
 
-	f, err := os.Create(dest)
-	if err != nil {
-		return err
-	}
-
-	var reader io.Reader = resp.Body
-	progress := make(chan int)
+	var netReader io.Reader = resp.Body
 	if resp.ContentLength >= 0 {
-		reader = &ProgressReader{
+		//adds a progress bar
+		progress := make(chan int64)
+		go func() {
+			bar := pb.New64(resp.ContentLength)
+			bar.Format("[=>_]")
+			bar.Start()
+			for n := range progress {
+				bar.Add64(n)
+			}
+			bar.FinishPrint(fmt.Sprintf("Downloaded and extracted %s", addr))
+		}()
+		netReader = &ProgressReader{
 			reader:   resp.Body,
 			progress: progress,
 		}
-		go func() {
-			read := 0
-			i := 0.0
-			incr := 5.0
-			for n := range progress {
-				read = read + n
-				current := float64(read) / float64(resp.ContentLength) * 100.0
-				if current >= i+incr {
-					i = i + incr
-					log.Printf("[%s] Progress: %f%%", addr, current)
-				}
-			}
-			log.Printf("[%s] Finished", addr)
-		}()
+		defer close(progress)
 	}
-	defer close(progress)
-	_, err = io.Copy(f, reader)
 
-	if err != nil {
-		return err
+	tarReader := tar.NewReader(bzip2.NewReader(netReader))
+	for {
+		fileHeader, err := tarReader.Next()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			return err
+		}
+		err = m.extractFile(v, fileHeader, tarReader)
+		if err != nil {
+			return fmt.Errorf("Cannot extract %s: %s", fileHeader.Name, err)
+		}
 	}
 	return nil
 }
@@ -251,15 +320,13 @@ func (m *SymlinkWebotsManager) Install(v WebotsVersion) error {
 	if err != nil {
 		return err
 	}
-
-	tmpDir, err := ioutil.TempDir("", "webots-manager-download")
+	log.Printf("Downloading from %s", address)
+	err = m.uncompressFromHttp(v, address)
 	if err != nil {
 		return err
 	}
-
-	dest := path.Join(tmpDir, path.Base(address))
-	log.Printf(dest)
-	return fmt.Errorf("Not yet implemenetd")
+	log.Printf("Successfuly installed %s", v)
+	return nil
 }
 
 func (m *SymlinkWebotsManager) Installed() []WebotsVersion {

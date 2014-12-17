@@ -68,7 +68,21 @@ func (x *InitCommand) Execute(args []string) error {
 }
 
 func (x *InstallCommand) Execute(args []string) error {
-	return fmt.Errorf("Not yet implemented")
+	if len(args) != 1 {
+		return fmt.Errorf("Missing version to install")
+	}
+
+	v, err := ParseWebotsVersion(args[0])
+	if err != nil {
+		return err
+	}
+
+	xx, err := NewInteractor()
+	if err != nil {
+		return err
+	}
+
+	return xx.manager.Install(v)
 }
 
 func init() {
