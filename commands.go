@@ -10,8 +10,41 @@ type InitCommand struct{}
 
 type InstallCommand struct{}
 
+type Interactor struct {
+	archive WebotsArchive
+}
+
+func NewInteractor() (*Interactor, error) {
+	res := &Interactor{}
+	var err error
+	res.archive, err = NewWebotsHttpArchive("http://www.cyberbotics.com/archive/")
+	if err != nil {
+		return nil, err
+	}
+	return res, nil
+}
+
 func (x *ListCommand) Execute(args []string) error {
-	return fmt.Errorf("Not yet implemented")
+	xx, err := NewInteractor()
+	if err != nil {
+		return err
+	}
+	fmt.Println("No webots version are installed")
+	if x.All {
+		fmt.Println("List of all available versions:")
+		for _, v := range xx.archive.AvailableVersions() {
+			fmt.Printf(" - %s\n", v)
+		}
+	} else {
+		vers := xx.archive.AvailableVersions()
+		if len(vers) == 0 {
+			return fmt.Errorf("No version are available")
+		}
+		fmt.Printf("Last available version is %s\n",
+			vers[len(vers)-1])
+	}
+
+	return nil
 }
 
 func (x *InitCommand) Execute(args []string) error {
