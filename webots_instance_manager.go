@@ -387,9 +387,13 @@ func getGid(g string) (int, error) {
 		} else if err != nil {
 			return -1, err
 		}
+		if l == "\n" || len(l) == 0 {
+			continue
+		}
+
 		m := groupRx.FindStringSubmatch(l)
 		if m == nil {
-			return -1, fmt.Errorf("Invalid line %s", l)
+			return -1, fmt.Errorf("Invalid line '%s'", l)
 		}
 		if m[1] == g {
 			gid, err := strconv.ParseInt(m[2], 10, 0)
